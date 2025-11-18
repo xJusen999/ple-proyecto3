@@ -8,10 +8,45 @@ syntax Module
 | dataDecl: Data
 ; 
 // Spec-compliant Data declarations
-syntax Data =
-  dataWithAssign: Id assignName "=" "data" "with" Variables vars DataBody body "end" Id endName
-| dataNoAssign: "data" "with" Variables vars DataBody body "end" Id endName
-;
+syntax Type
+  = intType:    "Int"
+  | boolType:   "Bool"
+  | charType:   "Char"
+  | stringType: "String"
+  | userType:   Id          // tipos definidos por el usuario con 'data'
+  ;
+
+syntax FieldDecl = fieldDecl: Id ":" Type;
+
+syntax FieldDecls = fieldDecls: FieldDecl ("," FieldDecl)*;
+
+// Spec-compliant Data declarations
+syntax Data
+  // FORMAS ORIGINALES (compatibles con el Proyecto 2)
+  = dataWithAssign:
+        Id assignName "=" "data" "with" Variables vars DataBody body "end" Id endName
+
+  | dataNoAssign:
+        "data" "with" Variables vars DataBody body "end" Id endName
+
+  // NUEVAS FORMAS TIPADAS (Proyecto 3)
+
+  // Ejemplo:
+  //   PointVar : Point = data with x : Int, y : Int
+  //                 Point = struct (x, y)
+  //              end Point
+  | dataWithAssignTyped:
+        Id assignName ":" Type dataType
+        "=" "data" "with" FieldDecls fields DataBody body "end" Id endName
+
+  // Ejemplo:
+  //   data with x : Int, y : Int
+  //        Point = struct (x, y)
+  //   end Point : Point
+  | dataNoAssignTyped:
+        "data" "with" FieldDecls fields DataBody body "end" Id endName ":" Type dataType
+  ;
+
 
 syntax DataBody = consBody: Constructor | funcBody: FunctionDef;
 
