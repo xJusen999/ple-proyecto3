@@ -22,12 +22,33 @@ data AType
 
 data IdRole = typeId() | fieldId();
 
+// Pretty printer opcional (útil si activas logs de TypePal)
+str prettyPrintAType(aInt())          = "Int";
+str prettyPrintAType(aBool())         = "Bool";
+str prettyPrintAType(aChar())         = "Char";
+str prettyPrintAType(aString())       = "String";
+str prettyPrintAType(aStruct(name))   = "Struct(<name>)";
+
 // -------------------------------------------------------------------
 // Configuración de TypePal
 // -------------------------------------------------------------------
 
+// Mapea nuestros tipos a nombres y roles para las reglas de
+// "un use debe referirse a un nombre definido".
+tuple[list[str] typeNames, set[IdRole] idRoles]
+aluGetTypeNamesAndRole(aStruct(str name)) = <[name], {typeId()}>;
+tuple[list[str] typeNames, set[IdRole] idRoles]
+aluGetTypeNamesAndRole(AType _)          = <[], {}>;
+
 private TypePalConfig aluConfig(bool debug = false)
-  = tconfig();
+  = tconfig(
+      getTypeNamesAndRole = aluGetTypeNamesAndRole
+      // Si quieres ver más info, puedes descomentar:
+      // verbose = debug,
+      // logTModel = debug,
+      // logAttempts = debug,
+      // logSolverIterations = debug
+    );
 
 // -------------------------------------------------------------------
 // Recolección de hechos
@@ -59,6 +80,7 @@ void collectType((Type) ty, Collector c) {
 
     // Tipo de dato definido por el usuario (data ...)
     case userType(Id tp):
+      // Verificamos que exista un data con ese nombre (rol typeId)
       c.use(tp, {typeId()});
 
     default:
@@ -74,8 +96,9 @@ private set[str] declaredFields(FieldDecls fields) {
   set[str] result = {};
 
   visit(fields) {
+    // fieldDecl: Id ":" Type
     case fieldDecl(Id f, Type _):
-      result += {"<f>"};
+      result += { "<f>" };
   }
 
   return result;
@@ -89,7 +112,7 @@ private set[str] usedFields(DataBody body) {
     case constructor(Id _, Variables vars):
       visit(vars) {
         case Id f:
-          result += {"<f>"};
+          result += { "<f>" };
       }
   }
 
@@ -107,7 +130,8 @@ void collectData((Data) d, Collector c) {
       handleTypedData(name, dataType, fields, body, d, c);
 
     // PointVar : Point = data with x : Int, ... end Point
-    case dataWithAssignTyped(Id assignName, Type dataType, FieldDecls fields, DataBody body, Id name):
+    case dataWithAssignTyped(Id assignName, Type dataType,
+                             FieldDecls fields, DataBody body, Id name):
       handleTypedData(name, dataType, fields, body, d, c);
 
     default:
@@ -119,18 +143,19 @@ void handleTypedData(Id name, Type dataType,
                      FieldDecls fields, DataBody body,
                      Data whole, Collector c) {
 
+  // Nombre del tipo, por ejemplo "Point"
   str typeName = "<name>";
 
-  // ✅ FIX 1: c.define pide un str, no un Id
-  c.define(typeName, typeId(), whole, aStruct(typeName));
+  // Definimos el tipo de datos (rol typeId)
+  c.define(typeName, typeId(), whole, defType(aStruct(typeName)));
 
-  // Dejamos que el resto del analizador vea tipos internos
-  collect(fields, c);
+  // Muy importante: seguir recolectando en las partes internas
   collect(dataType, c);
+  collect(fields, c);
   collect(body, c);
 
   // --- Regla nueva (Task 4) ---
-  // todos los campos usados en struct(...) deben estar en 'with ...'
+  // todos los campos usados en struct(...) deben estar en 'data with ...'
   set[str] declared = declaredFields(fields);
   set[str] used     = usedFields(body);
 
@@ -138,8 +163,7 @@ void handleTypedData(Id name, Type dataType,
     c.report(
       error(
         whole,
-        "Field " + f + " is used in struct " + typeName
-          + " but is not declared in the with-clause"
+        "Field <f> is used in struct <typeName> but is not declared in the with-clause"
       )
     );
   }
@@ -154,8 +178,7 @@ public TModel aluTModelForTree(Tree pt, bool debug = false) {
     pt = pt.top;
   }
 
-  // ✅ FIX 2: debug es parámetro *keyword*
-  Collector c = newCollector("alu", pt, aluConfig(debug = debug));
+  Collector c = newCollector("alu", pt, config = aluConfig(debug = debug));
 
   collect(pt, c);
   return newSolver(pt, c.run()).run();
@@ -164,7 +187,6 @@ public TModel aluTModelForTree(Tree pt, bool debug = false) {
 public list[Message] typeCheckCode(str code, bool debug = false) {
   Tree t = parse(#start[Program], code);
 
-  // ✅ FIX 3: igual, debug keyword al llamar aluTModelForTree
   TModel tm = aluTModelForTree(t, debug = debug);
 
   if (debug) {

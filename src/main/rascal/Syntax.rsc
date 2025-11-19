@@ -1,13 +1,18 @@
 module Syntax
 
+// ================================================================
 // Programa y módulos
-start syntax Program = program: Module+ modules ; 
+// ================================================================
+start syntax Program = program: Module+ modules ;
 
 syntax Module
-= funcDef: FunctionDef
-| dataDecl: Data
-; 
-// Spec-compliant Data declarations
+  = funcDef: FunctionDef
+  | dataDecl: Data
+  ;
+
+// ================================================================
+// Tipos
+// ================================================================
 syntax Type
   = intType:    "Int"
   | boolType:   "Bool"
@@ -16,11 +21,15 @@ syntax Type
   | userType:   Id          // tipos definidos por el usuario con 'data'
   ;
 
-syntax FieldDecl = fieldDecl: Id ":" Type;
+// ================================================================
+// Declaración de campos para data tipado
+// ================================================================
+syntax FieldDecl  = fieldDecl: Id ":" Type ;
+syntax FieldDecls = fieldDecls: FieldDecl ("," FieldDecl)* ;
 
-syntax FieldDecls = fieldDecls: FieldDecl ("," FieldDecl)*;
-
-// Spec-compliant Data declarations
+// ================================================================
+// Data (formas antiguas + formas nuevas tipadas)
+// ================================================================
 syntax Data
   // FORMAS ORIGINALES (compatibles con el Proyecto 2)
   = dataWithAssign:
@@ -47,154 +56,183 @@ syntax Data
         "data" "with" FieldDecls fields DataBody body "end" Id endName ":" Type dataType
   ;
 
+// El cuerpo del data: o un constructor o una función
+syntax DataBody
+  = consBody: Constructor
+  | funcBody: FunctionDef
+  ;
 
-syntax DataBody = consBody: Constructor | funcBody: FunctionDef;
+// Constructor tipo struct
+syntax Constructor
+  = constructor: Id name "=" "struct" "(" Variables vars ")"
+  ;
 
-syntax Constructor = constructor: Id name "=" "struct" "(" Variables vars ")";
-
-// (legacy DataAbstraction removed)
-
+// ================================================================
 // Funciones
+// ================================================================
 syntax FunctionDef =
-functionDef: "function" Id name "(" {Id ","}* params ")"
-"do" Statement* body
-"end" Id endName ; 
+  functionDef: "function" Id name "(" {Id ","}* params ")"
+               "do" Statement* body
+               "end" Id endName
+  ;
 
-syntax ParameterList = parameterList: Id ("," Id)* ; 
+syntax ParameterList = parameterList: Id ("," Id)* ;
 
+// ================================================================
 // Sentencias
+// ================================================================
 syntax Statement
-= assignStmt: Id varName "=" Expression val 
-| conditionalStmt: ConditionalStmt ifs 
-| loopStmt: LoopStmt loop 
-// New statements per grammar
-| invokeStmt: Invocation inv
-| iteratorStmt: Id varName "=" "iterator" "(" {Id ","}* inVars ")" "yielding" "(" {Id ","}* outVars ")"
-| rangeStmtWithVar: Id varName "=" "from" Principal fromP "to" Principal toP
-| rangeStmtBare: "from" Principal fromP "to" Principal toP
-; 
+  = assignStmt: Id varName "=" Expression val 
+  | conditionalStmt: ConditionalStmt ifs 
+  | loopStmt: LoopStmt loop 
+  | invokeStmt: Invocation inv
+  | iteratorStmt:
+        Id varName "=" "iterator" "(" {Id ","}* inVars ")"
+        "yielding" "(" {Id ","}* outVars ")"
+  | rangeStmtWithVar:
+        Id varName "=" "from" Principal fromP "to" Principal toP
+  | rangeStmtBare:
+        "from" Principal fromP "to" Principal toP
+  ;
 
-// Variables list (for invocations/iterators)
-syntax Variables = variables: Id ("," Id)* ; // retained for other uses if needed
+// Lista de variables
+syntax Variables = variables: Id ("," Id)* ;
 
-// Invocation forms
+// ================================================================
+// Invocaciones
+// ================================================================
 syntax Invocation
-= dollarInvoke: Id name "$" "(" {Id ","}* vars ")"
-| methodInvoke: Id recv "." Id method "(" {Id ","}* vars ")"
-; 
+  = dollarInvoke: Id name "$" "(" {Id ","}* vars ")"
+  | methodInvoke: Id recv "." Id method "(" {Id ","}* vars ")"
+  ;
 
-// Constructores
+// ================================================================
+// Construcciones de datos
+// ================================================================
 syntax DataConstruction
-= dataConstruction: ConstructorCall ; 
+  = dataConstruction: ConstructorCall ;
 
-syntax ConstructorCall =
-ctorCall: "sequence" "[" {Expression ","}* "]"
-| ctorCall: "tuple" "(" {Expression ","}* ")"
-| ctorCall: "struct" "(" {Expression ","}* args ")" ; 
+syntax ConstructorCall
+  = ctorCall: "sequence" "[" {Expression ","}* "]"
+  | ctorCall: "tuple" "(" {Expression ","}* ")"
+  | ctorCall: "struct" "(" {Expression ","}* args ")"
+  ;
 
-syntax NamedArg = namedArg: Id name ":" Expression expr ; 
+syntax NamedArg = namedArg: Id name ":" Expression expr ;
 
+// ================================================================
 // Condicionales
+// ================================================================
 syntax ConditionalStmt
-= ifStmt: IfStmt
-| condStmt: CondStmt
-; 
+  = ifStmt: IfStmt
+  | condStmt: CondStmt
+  ;
 
 syntax IfStmt =
-ifStmt: "if" Expression cond "then" Statement* thenBlock
-("elseif" Expression "then" Statement*)* elseifBlocks
-("else" Statement* elseBlock)?
-"end" ; 
+  ifStmt: "if" Expression cond "then" Statement* thenBlock
+          ("elseif" Expression "then" Statement*)* elseifBlocks
+          ("else" Statement* elseBlock)?
+          "end"
+  ;
 
 syntax CondStmt =
-condStmt: "cond" Expression cond "do" CondClause+ clauses "end" ; 
+  condStmt: "cond" Expression cond "do" CondClause+ clauses "end"
+  ;
 
-syntax CondClause = condClause: Expression cond "-\>" Statement+ body ;
+syntax CondClause =
+  condClause: Expression cond Statement+ body ;
 
-
+// ================================================================
 // Bucles
+// ================================================================
 syntax LoopStmt =
-forRange: "for" Id var "from" Expression fromExpr "to" Expression toExpr "do" Statement* body "end" 
-| forIn: "for" Id var "in" Expression expr "do" Statement* body "end"
-; 
+  forRange:
+    "for" Id var "from" Expression fromExpr "to" Expression toExpr
+    "do" Statement* body "end"
+  | forIn:
+    "for" Id var "in" Expression expr
+    "do" Statement* body "end"
+  ;
 
-// Jerarquía de expresiones 
-syntax Expression = orExpr: OrExpr expr ; 
+// ================================================================
+// Jerarquía de expresiones
+// ================================================================
+syntax Expression = orExpr: OrExpr expr ;
 
-// Lógica booleana OR 
+// OR
 syntax OrExpr
-= andExpr: AndExpr expr
-| left binaryOr: OrExpr left "or" AndExpr right
-; 
+  = andExpr: AndExpr expr
+  | left binaryOr: OrExpr left "or" AndExpr right
+  ;
 
-// Lógica booleana AND 
+// AND
 syntax AndExpr
-= cmpExpr: CmpExpr expr
-| left binaryAnd: AndExpr left "and" CmpExpr right
-; 
+  = cmpExpr: CmpExpr expr
+  | left binaryAnd: AndExpr left "and" CmpExpr right
+  ;
 
-// Comparación 
+// Comparación
 syntax CmpExpr
-= addExpr: AddExpr expr
-| non-assoc binaryExpr: AddExpr left CmpOp op AddExpr right
-; 
+  = addExpr: AddExpr expr
+  | non-assoc binaryExpr: AddExpr left CmpOp op AddExpr right
+  ;
 
-lexical CmpOp = "\<" | "\>" | "\<=" | "\>=" | "\<\>" | "=" ; 
+lexical CmpOp = "\<" | "\>" | "\<=" | "\>=" | "\<\>" | "=" ;
 
-// Suma/Resta 
+// Suma / Resta
 syntax AddExpr
-= mulExpr: MulExpr expr
-| left binaryAdd: AddExpr left AddOp op MulExpr right
-; 
+  = mulExpr: MulExpr expr
+  | left binaryAdd: AddExpr left AddOp op MulExpr right
+  ;
 
 lexical AddOp = "+" | "-" ;
 
-// Multiplicación/División/Módulo 
+// Multiplicación / División / Módulo
 syntax MulExpr
-= powExpr: PowExpr expr
-| left binaryMul: MulExpr left MulOp op PowExpr right
-; 
+  = powExpr: PowExpr expr
+  | left binaryMul: MulExpr left MulOp op PowExpr right
+  ;
 
 lexical MulOp = "*" | "/" | "%" ;
 
-// Potencia 
+// Potencia
 syntax PowExpr
-= unaryExpr: UnaryExpr expr
-| right binaryPow: UnaryExpr left "**" PowExpr right
-; 
+  = unaryExpr: UnaryExpr expr
+  | right binaryPow: UnaryExpr left "**" PowExpr right
+  ;
 
-// Expresiones unarias
+// Unarias
 syntax UnaryExpr
-= postfix: Postfix postfixExpr
-| unaryNeg: "neg" UnaryExpr operand
-| unaryMinus: "-" UnaryExpr operand
-; 
+  = postfix: Postfix postfixExpr
+  | unaryNeg: "neg" UnaryExpr operand
+  | unaryMinus: "-" UnaryExpr operand
+  ;
 
-// Postfix 
-syntax Postfix
-  = primary: Primary primaryExpr
-; 
+// Postfix
+syntax Postfix = primary: Primary primaryExpr ;
 
-// Expresiones primarias 
+// Primarias
 syntax Primary
-= bracket groupExpr: "(" Expression expr ")" 
-> literalExpr: Literal lit 
-> varExpr: Id name 
-| ctorExpr: ConstructorCall ctor 
-| invExpr: Invocation inv
-; 
+  = bracket groupExpr: "(" Expression expr ")"
+  > literalExpr: Literal lit
+  > varExpr: Id name
+  | ctorExpr: ConstructorCall ctor
+  | invExpr: Invocation inv
+  ;
 
-// Principals (used in ranges, etc.)
+// Principals (para rangos, etc.)
 syntax Principal
-= pTrue: "true"
-| pFalse: "false"
-| pChar: Char
-| pInt: Integer
-| pFloat: Float
-| pId: Id
-;
+  = pTrue: "true"
+  | pFalse: "false"
+  | pChar: Char
+  | pInt: Integer
+  | pFloat: Float
+  | pId: Id
+  ;
 
+// ================================================================
 // Literales
+// ================================================================
 syntax Literal
   = floatLit: Float realValue
   | intLit: Integer intValue
@@ -203,59 +241,59 @@ syntax Literal
   | stringLit: String strValue
   ;
 
-// Tokens Léxicos
-
-// Boolean literals
+// ================================================================
+// Léxicos
+// ================================================================
 lexical BooleanLit = "true" | "false" ;
 
-// Identificadores (excludes reserved words including boolean literals)
-lexical Id = [a-zA-Z_][a-zA-Z0-9_\-]* \ Reserved 
-           \ "true"
-           \ "false" ; 
+// Identificadores: excluimos todas las palabras reservadas, incluidos Int/Bool/Char/String
+lexical Id =
+  [a-zA-Z_][a-zA-Z0-9_\-]* \ Reserved
+  ;
 
-// Números
-lexical Float = [0-9]+ "." [0-9]+ ;
-
+lexical Float   = [0-9]+ "." [0-9]+ ;
 lexical Integer = [0-9]+ ;
 
 // Caracteres
-lexical Char = [\'] CharContent [\'] ; 
+lexical Char = [\'] CharContent [\'] ;
 
 lexical CharContent
-= "\\\\"
-| [\'][\\][\']
-| "\\n"
-| "\\t"
-| "\\r"
-| ![\'\\]
-; 
+  = "\\\\"
+  | [\'][\\][\']
+  | "\\n"
+  | "\\t"
+  | "\\r"
+  | ![\'\\]
+  ;
 
-// Cadenas de texto
-lexical String = [\"] StringContent* [\"] ; 
+// Cadenas
+lexical String = [\"] StringContent* [\"] ;
 
 lexical StringContent
-= "\\\\"
-| [\"][\\][\"]
-| "\\n"
-| "\\t"
-| "\\r"
-| ![\"\\]
-; 
+  = "\\\\"
+  | [\"][\\][\"]
+  | "\\n"
+  | "\\t"
+  | "\\r"
+  | ![\"\\]
+  ;
 
-
-// Palabras reservadas 
+// Palabras reservadas
 keyword Reserved =
-"data" | "with" | "rep" | "struct" | "function" | "do" | "end"
-| "if" | "then" | "elseif" | "else" | "cond" | "for" | "from" | "to" | "in"
-| "iterator" | "yielding" | "sequence" | "tuple"
-| "and" | "or" | "neg" | "true" | "false" ;
+  "data" | "with" | "rep" | "struct" | "function" | "do" | "end"
+  | "if" | "then" | "elseif" | "else" | "cond" | "for" | "from" | "to" | "in"
+  | "iterator" | "yielding" | "sequence" | "tuple"
+  | "and" | "or" | "neg"
+  | "true" | "false"
+  | "Int" | "Bool" | "Char" | "String"
+  ;
 
-// Espacios y comentarios
-layout Layout = WhitespaceOrComment* !>> [\ \t\n\r#];
+// Layout / comentarios
+layout Layout = WhitespaceOrComment* !>> [\ \t\n\r#] ;
 
 lexical WhitespaceOrComment
-= [\ \t\n\r]
-| Comment
-; 
+  = [\ \t\n\r]
+  | Comment
+  ;
 
-lexical Comment = "#" ![\n\r]* ; 
+lexical Comment = "#" ![\n\r]* ;
