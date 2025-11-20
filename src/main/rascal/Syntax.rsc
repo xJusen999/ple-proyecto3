@@ -18,7 +18,7 @@ syntax Type
   | boolType:   "Bool"
   | charType:   "Char"
   | stringType: "String"
-  | userType:   Id          // tipos definidos por el usuario con 'data'
+  | userType:   Id          
   ;
 
 // ================================================================
@@ -31,38 +31,30 @@ syntax FieldDecls = fieldDecls: FieldDecl ("," FieldDecl)* ;
 // Data (formas antiguas + formas nuevas tipadas)
 // ================================================================
 syntax Data
-  // FORMAS ORIGINALES (compatibles con el Proyecto 2)
+
   = dataWithAssign:
         Id assignName "=" "data" "with" Variables vars DataBody body "end" Id endName
 
   | dataNoAssign:
         "data" "with" Variables vars DataBody body "end" Id endName
 
-  // NUEVAS FORMAS TIPADAS (Proyecto 3)
 
-  // Ejemplo:
-  //   PointVar : Point = data with x : Int, y : Int
-  //                 Point = struct (x, y)
-  //              end Point
   | dataWithAssignTyped:
         Id assignName ":" Type dataType
         "=" "data" "with" FieldDecls fields DataBody body "end" Id endName
 
-  // Ejemplo:
-  //   data with x : Int, y : Int
-  //        Point = struct (x, y)
-  //   end Point : Point
+
   | dataNoAssignTyped:
         "data" "with" FieldDecls fields DataBody body "end" Id endName ":" Type dataType
   ;
 
-// El cuerpo del data: o un constructor o una función
+
 syntax DataBody
   = consBody: Constructor
   | funcBody: FunctionDef
   ;
 
-// Constructor tipo struct
+
 syntax Constructor
   = constructor: Id name "=" "struct" "(" Variables vars ")"
   ;
@@ -288,7 +280,6 @@ keyword Reserved =
   | "Int" | "Bool" | "Char" | "String"
   ;
 
-// Layout / comentarios
 layout Layout = WhitespaceOrComment* !>> [\ \t\n\r#] ;
 
 lexical WhitespaceOrComment
